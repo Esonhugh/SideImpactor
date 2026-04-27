@@ -581,7 +581,17 @@ export async function loginAppleDeveloperAccount(request: AppleDeveloperLoginReq
       api = fresh.api;
       const { getAnisetteData } = await import('./anisette-service');
       const freshAnisette = await getAnisetteData();
-      ({ session } = await api.authenticate(appleId, password, freshAnisette, verificationCallback));
+      try {
+        ({ session } = await api.authenticate(appleId, password, freshAnisette, verificationCallback));
+      } catch (reauth2) {
+        // If the fresh SRP exchange also hits the apptokens 2FA gate (rare),
+        // REAUTH_SENTINEL escapes here. Surface it as a human-readable error
+        // instead of exposing the internal sentinel string.
+        if (reauth2 instanceof Error && reauth2.message === REAUTH_SENTINEL) {
+          throw new Error('Authentication failed after two-factor verification. Please sign in again.');
+        }
+        throw reauth2;
+      }
     } else {
       throw e;
     }
