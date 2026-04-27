@@ -332,8 +332,7 @@ function patchAuthenticateRetry(api: AppleAPI, _apiFetch: AltsignFetch): void {
       if (params?.['o'] === 'apptokens' && Object.keys(response).length === 0) {
         if (twoFactorDone) {
           // 2FA was already completed — this is a genuine failure, not a gate.
-          console.error('[auth] apptokens still empty/erroring after 2FA — authentication failed');
-          return response;
+          throw new Error('Authentication failed after two-factor verification. Please sign in again.');
         }
         console.log('[auth] apptokens 2FA gate detected — triggering verification');
         const adsid = params['u'] as string;
@@ -350,7 +349,10 @@ function patchAuthenticateRetry(api: AppleAPI, _apiFetch: AltsignFetch): void {
             throw new Error(REAUTH_SENTINEL);
           }
         }
-        console.error('[auth] apptokens 2FA failed or no handler available');
+        // 2FA was cancelled by the user or no handler was available.
+        // Throw instead of returning {} so altsign.js doesn't try to process
+        // an invalid empty response (which would crash with atob(undefined)).
+        throw new Error('Two-factor authentication was cancelled. Please sign in again.');
       }
 
       return response;
